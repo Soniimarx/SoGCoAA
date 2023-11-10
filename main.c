@@ -17,8 +17,8 @@
 
 //Declaring the function prototypes
 void handle_launch_signal();
-void handle_bomb_signal(char*);
-void handle_refuel_signal(char*);
+void handle_bomb_signal(pid_t);
+void handle_refuel_signal(pid_t);
 void handle_invalid_command();
 void spawn_plane_process();
 
@@ -32,22 +32,38 @@ int main() {
     //Prompy the user for a command
     printf("Enter a command: ");
     char command[10];
-    char argument[10];
-    scanf("%s %s", command, argument);
+    pid_t pid;
+    scanf("%s %d", command, pid);
 
     //Checking the command in order to take the appropriate action
     if (strcmp(command, LAUNCH) == 0){
       handle_launch_signal();
+
     } else if (strcmp(command,BOMB) == 0){
-      handle_bomb_signal(argument);
+      handle_bomb_signal(pid);
+
     }else if(strcmp(command,REFUEL) == 0){
-      handle_refuel_signal(argument);
+      handle_refuel_signal(pid);
+
     } else if(strcmp(command, QUIT)==0){
       kill(0,SIGINT);
       break;
+
     }else{
       handle_invalid_command;
     }
   }
   return 0;
 }
+
+//The function to handle the SIG_BOMB signal
+void handle_bomb_signal(pid_t pid){
+  if (pid == NULL){
+    printf("Error: The bomb commnad requires an argument\n");
+    return;
+  }
+  kill(0, SIGKILL, pid);
+}
+
+
+
