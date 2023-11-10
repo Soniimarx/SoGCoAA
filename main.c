@@ -62,8 +62,25 @@ void handle_bomb_signal(pid_t pid){
     printf("Error: The bomb commnad requires an argument\n");
     return;
   }
-  kill(0, SIGKILL, pid);
+  kill(pid, SIG_BOMB);
 }
 
+void handle_refuel_signal(pid_t pid){
+  if (pid == NULL){
+    printf("Error: The refuel command requires an argument\n");
+    return;
+  }
+  kill(pid, SIG_REFUEL);
+}
 
+void handle_launch_signal(){
+  //Code to handle the launch signal. Should incorporate the spawn_plane_process()
+}
 
+void handle_invalid_command(){
+  //Code to handle invalid commands
+}
+
+void spawn_plane_process(){
+  //Code to spawn another "child" process
+}
