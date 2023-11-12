@@ -1,150 +1,170 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <signal.h>
 
-// Defining the possible commands
-#define LAUNCH "L"      \
-               "launch" \
-               "l"
-#define BOMB "B"    \
-             "bomb" \
-             "b"
-#define REFUEL "R"      \
-               "refuel" \
-               "r"
-#define QUIT "Q"    \
-             "quit" \
-             "q"
+#define MAX_PLANES 5
 
-// Defining the signals that will be used to communicate between the parent and child processes.
-#define SIG_LAUNCH SIGUSR1
-#define SIG_BOMB SIGUSR2
-#define SIG_REFUEL SIGINT
+int planes[MAX_PLANES];
+int num_planes = 0;
 
-// Declaring the function prototypes
-void handle_launch_signal();
-void handle_bomb_signal(pid_t pid);
-void handle_refuel_signal(pid_t pid);
-void handle_invalid_command();
-void spawn_plane_process();
+void launch_plane();
+void bomb_plane();
+void refuel_plane();
+void plane_report(int signum);
 
-// Checking if the PID is valid
-bool is_pid_valid(pid_t pid)
-{
-  int err = kill(pid, SIG_ZERO);
-  return err == 0;
-}
+void handle_sigusr1(int signum);
+void handle_sigusr2(int signum);
 
-// Handling the SIG_BOMB signal
-void handle_bomb_signal(pid_t pid)
-{
-  if (!is_pid_valid(pid))
-  {
-    printf("Error: The bomb command requires a valid PID\n");
-    return;
-  }
-
-  kill(pid, SIG_BOMB);
-}
-
-// Handling the SIG_REFUEL signal
-void handle_refuel_signal(pid_t pid)
-{
-  if (!is_pid_valid(pid))
-  {
-    printf("Error: The refuel command requires a valid PID\n");
-    return;
-  }
-
-  kill(pid, SIG_REFUEL);
-}
-
-// Handling the SIG_LAUNCH signal
-void handle_launch_signal()
-{
-  spawn_plane_process();
-}
-
-// Handling invalid commands
-void handle_invalid_command()
-{
-  printf("Error: Invalid command.\n");
-}
-
-// Spawning a new plane process
-void spawn_plane_process()
-{
-  // Creating a new child process
-  pid_t pid = fork();
-  if (pid == 0)
-  {
-    // Child process code
-    int fuel_level = 100;
-    while (fuel_level > 0)
-    {
-      fuel_level -= 5;
-      sleep(3);
-      printf("Bomber %d to base, %d%% of fuel left\n", getpid(), fuel_level);
-    }
-
-    // Exit the child process
-    exit(0);
-  }
-  else if (pid > 0)
-  {
-    // Parent process code
-    // Do nothing
-  }
-  else
-  {
-    // Error creating a new process
-    perror("fork");
-    exit(1);
-  }
-}
-
-// Main function
 int main()
 {
-  // Registering the signal handlers
-  signal(SIG_LAUNCH, handle_launch_signal);
-  signal(SIG_BOMB, handle_bomb_signal);
-  signal(SIG_REFUEL, handle_refuel_signal);
+  signal(SIGUSR1, handle_sigusr1);
+  signal(SIGUSR2, handle_sigusr2);
 
-  // Main loop
   while (1)
   {
-    // Prompting the user for a command
-    printf("Enter a command: ");
     char command[10];
-    pid_t pid;
-    scanf("%s %d", command, &pid);
 
-    // Checking the command
-    if (strcmp(command, LAUNCH) == 0)
+    printf("Enter command (launch, bomb, refuel, quit): ");
+    scanf("%s", command);
+
+    if (strcmp(command, "launch") == 0)
     {
-      handle_launch_signal();
+      if (num_planes < MAX_PLANES)
+      {
+        launch_plane();
+      }
+      else
+      {
+        printf("Cannot launch more planes. Maximum limit reached.\n");
+      }
     }
-    else if (strcmp(command, BOMB) == 0)
+    else if (strcmp(command, "bomb") == 0)
     {
-      handle_bomb_signal(pid);
+      bomb_plane();
     }
-    else if (strcmp(command, REFUEL) == 0)
+    else if (strcmp(command, "refuel") == 0)
     {
-      handle_refuel_signal(pid);
+      refuel_plane();
     }
-    else if (strcmp(command, QUIT) == 0)
+    else if (strcmp(command, "quit") == 0)
     {
-      kill(0, SIGINT);
-      break;
+      // Wait for all planes to finish
+      for (int i = 0; i < num_planes; i++)
+      {
+        kill(planes[i], SIGTERM);
+        waitpid(planes[i], NULL, 0);
+      }
+      exit(0);
     }
     else
     {
-      handle_invalid_command();
+      printf("Invalid command. Please enter a valid command.\n");
     }
   }
 
   return 0;
+}
+
+void launch_plane()
+{
+  int pid = fork();
+
+  if (pid == 0)
+  {
+    // Child (plane) process
+    while (1)
+    {
+      sleep(1); // Fuel decreases every second
+      plane_report(SIGALRM);
+    }
+  }
+  else if (pid > 0)
+  {
+    // Parent (base) process
+    planes[num_planes++] = pid;
+    printf("Plane %d launched!\n", pid);
+  }
+  else
+  {
+    perror("Failed to fork plane process");
+  }
+}
+
+void bomb_plane()
+{
+  if (num_planes > 0)
+  {
+    int plane_id;
+    printf("Enter plane ID to bomb: ");
+    scanf("%d", &plane_id);
+
+    if (kill(plane_id, SIGUSR1) == 0)
+    {
+      printf("Bomb signal sent to Plane %d!\n", plane_id);
+    }
+    else
+    {
+      perror("Failed to send bomb signal");
+    }
+  }
+  else
+  {
+    printf("No planes are flying, can't drop a bomb!\n");
+  }
+}
+
+void refuel_plane()
+{
+  if (num_planes > 0)
+  {
+    int plane_id;
+    printf("Enter plane ID to refuel: ");
+    scanf("%d", &plane_id);
+
+    if (kill(plane_id, SIGUSR2) == 0)
+    {
+      printf("Refuel signal sent to Plane %d!\n", plane_id);
+    }
+    else
+    {
+      perror("Failed to send refuel signal");
+    }
+  }
+  else
+  {
+    printf("No planes are flying, can't refuel!\n");
+  }
+}
+
+void handle_sigusr1(int signum)
+{
+  printf("Bomber %d to base, bombs away!\n", getpid());
+}
+
+void handle_sigusr2(int signum)
+{
+  printf("Plane %d has been refueled\n", getpid());
+}
+
+void plane_report(int signum)
+{
+  static int fuel = 100;
+
+  if (signum == SIGALRM)
+  {
+    fuel -= 5;
+    if (fuel <= 0)
+    {
+      printf("SoS! Plane %d is going to crash\n", getpid());
+      exit(0);
+    }
+
+    if (fuel % 15 == 0)
+    {
+      printf("Bomber %d to base, %d%% of fuel left\n", getpid(), fuel);
+    }
+  }
 }
