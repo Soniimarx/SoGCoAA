@@ -74,13 +74,32 @@ void handle_refuel_signal(pid_t pid){
 }
 
 void handle_launch_signal(){
-  //Code to handle the launch signal. Should incorporate the spawn_plane_process()
+  printf("Base received SIG_LAUNCH signal\n");
+  spawn_plane_process();
 }
 
 void handle_invalid_command(){
   //Code to handle invalid commands
+  printf("Error: Invalid Command.\n");
 }
 
 void spawn_plane_process(){
   //Code to spawn another "child" process
+  pid_t pid = fork();
+  kill(pid,SIG_LAUNCH);
+  if (pid == 0){
+    int fuel_level = 100;
+    while (fuel_level > 0){
+      fuel_level -= 5;
+      sleep(3);
+      printf("Bomber %d to base, %d%% of fuel left\n", getpid(), fuel_level);
+    }
+    //All fuel has been consumed so exit the process
+    exit(0);
+  }else{
+    //Error creating a new process
+    perror("fork");
+    exit(1);
+  }
+  
 }
