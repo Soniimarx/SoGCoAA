@@ -77,7 +77,7 @@ void launch_plane()
     // Child (plane) process
     while (1)
     {
-      sleep(1); // Fuel decreases every second
+      sleep(3); // Fuel decreases every second
       plane_report(SIGALRM);
     }
   }
