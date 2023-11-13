@@ -27,32 +27,6 @@ void bomb_plane();
 void refuel_plane();
 
 void sig_handler(int signum);
-#include <string.h>
-#include <time.h>
-
-#define MAX_PLANES 5
-
-typedef struct
-{
-    int pid;
-    int fuel;
-    time_t last_update_time; // New field to track the last update time
-    int pipe_fd[2];          // Pipe file descriptors for communication
-} Plane;
-
-Plane planes[MAX_PLANES];
-int num_planes = 0;
-int plane_id;
-void launch_plane();
-void bomb_plane();
-void refuel_plane();
-
-void sig_handler(int signum);
-
-int main()
-{
-    signal(SIGUSR1, sig_handler);
-    signal(SIGUSR2, sig_handler);
 int main()
 {
     signal(SIGUSR1, sig_handler);
@@ -205,7 +179,6 @@ void launch_plane()
     {
         // Parent (base) process
         planes[num_planes++] = (Plane){.pid = pid, .fuel = 100, .last_update_time = time(NULL)}; // Initialize last_update_time
-
         // Create a pipe for communication
         if (pipe(planes[num_planes - 1].pipe_fd) == -1)
         {
