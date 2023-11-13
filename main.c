@@ -2,8 +2,31 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <unistd.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_PLANES 5
+
+typedef struct
+{
+    int pid;
+    int fuel;
+    time_t last_update_time; // New field to track the last update time
+    int pipe_fd[2];          // Pipe file descriptors for communication
+} Plane;
+
+Plane planes[MAX_PLANES];
+int num_planes = 0;
+int plane_id;
+void launch_plane();
+void bomb_plane();
+void refuel_plane();
+
+void sig_handler(int signum);
 #include <string.h>
 #include <time.h>
 
@@ -30,7 +53,54 @@ int main()
 {
     signal(SIGUSR1, sig_handler);
     signal(SIGUSR2, sig_handler);
+int main()
+{
+    signal(SIGUSR1, sig_handler);
+    signal(SIGUSR2, sig_handler);
 
+    while (1)
+    {
+        char command[10];
+
+        printf("Enter command (launch, bomb, refuel, quit): ");
+        scanf("%s", command);
+
+        if (strcmp(command, "launch") == 0)
+        {
+            if (num_planes < MAX_PLANES)
+            {
+                launch_plane();
+            }
+            else
+            {
+                printf("Cannot launch more planes. Maximum limit reached.\n");
+            }
+        }
+        else if (strcmp(command, "bomb") == 0)
+        {
+            bomb_plane();
+        }
+        else if (strcmp(command, "refuel") == 0)
+        {
+            refuel_plane();
+        }
+        else if (strcmp(command, "quit") == 0)
+        {
+            // Wait for all planes to finish
+            for (int i = 0; i < num_planes; i++)
+            {
+                kill(planes[i].pid, SIGTERM);
+                waitpid(planes[i].pid, NULL, 0);
+            }
+            exit(0);
+        }
+        else
+        {
+            printf("Invalid command. Please enter a valid command.\n");
+        }
+    }
+
+    return 0;
     while (1)
     {
         char command[10];
@@ -219,4 +289,3 @@ void sig_handler(int signum)
         //
     }
 }
-
