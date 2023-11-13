@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <unistd.h>
-#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
@@ -11,35 +9,41 @@
 
 #define MAX_PLANES 5
 
+// Structure to represent a plane
 typedef struct
 {
-    int pid;
-    int fuel;
-    time_t last_update_time; // New field to track the last update time
-    int pipe_fd[2];          // Pipe file descriptors for communication
+    int pid;                 // Process ID of the plane
+    int fuel;                // Remaining fuel of the plane
+    time_t last_update_time; // Time of the last fuel update for the plane
 } Plane;
 
-Plane planes[MAX_PLANES];
-int num_planes = 0;
-int plane_id;
-void launch_plane();
-void bomb_plane();
-void refuel_plane();
+Plane planes[MAX_PLANES]; // Array to store plane information
+int num_planes = 0;       // Number of currently flying planes
+int plane_id;             // Variable to store user-input plane ID
 
-void sig_handler(int signum);
+// Function declarations
+void launch_plane();          // Function to launch a new plane
+void bomb_plane();            // Function to send a bomb signal to a plane
+void refuel_plane();          // Function to send a refuel signal to a plane
+void sig_handler(int signum); // Signal handler function
+
 int main()
 {
+    // Set up signal handlers for user-defined signals
     signal(SIGUSR1, sig_handler);
     signal(SIGUSR2, sig_handler);
 
+    // Main program loop
     while (1)
     {
         char command[10];
 
+        // Prompt user for command
         printf("Enter command (launch, bomb, refuel, quit): ");
         scanf("%s", command);
 
-        if (strcmp(command, "launch") == 0)
+        // Execute the appropriate command based on user input
+        if ((strcmp(command, "launch") == 0) || (strcmp(command, "l")==0))
         {
             if (num_planes < MAX_PLANES)
             {
@@ -50,60 +54,17 @@ int main()
                 printf("Cannot launch more planes. Maximum limit reached.\n");
             }
         }
-        else if (strcmp(command, "bomb") == 0)
+        else if ((strcmp(command, "bomb") == 0) ||(strcmp(command, "b")==0))
         {
             bomb_plane();
         }
-        else if (strcmp(command, "refuel") == 0)
+        else if ((strcmp(command, "refuel") == 0) || (strcmp(command, "r")==0))
         {
             refuel_plane();
         }
-        else if (strcmp(command, "quit") == 0)
+        else if ((strcmp(command, "quit") == 0) || (strcmp(command, "q")))
         {
-            // Wait for all planes to finish
-            for (int i = 0; i < num_planes; i++)
-            {
-                kill(planes[i].pid, SIGTERM);
-                waitpid(planes[i].pid, NULL, 0);
-            }
-            exit(0);
-        }
-        else
-        {
-            printf("Invalid command. Please enter a valid command.\n");
-        }
-    }
-
-    return 0;
-    while (1)
-    {
-        char command[10];
-
-        printf("Enter command (launch, bomb, refuel, quit): ");
-        scanf("%s", command);
-
-        if (strcmp(command, "launch") == 0)
-        {
-            if (num_planes < MAX_PLANES)
-            {
-                launch_plane();
-            }
-            else
-            {
-                printf("Cannot launch more planes. Maximum limit reached.\n");
-            }
-        }
-        else if (strcmp(command, "bomb") == 0)
-        {
-            bomb_plane();
-        }
-        else if (strcmp(command, "refuel") == 0)
-        {
-            refuel_plane();
-        }
-        else if (strcmp(command, "quit") == 0)
-        {
-            // Wait for all planes to finish
+            // Terminate all planes and exit the program
             for (int i = 0; i < num_planes; i++)
             {
                 kill(planes[i].pid, SIGTERM);
@@ -120,6 +81,7 @@ int main()
     return 0;
 }
 
+// Function to launch a new plane
 void launch_plane()
 {
     int pid = fork();
@@ -127,11 +89,7 @@ void launch_plane()
     if (pid == 0)
     {
         // Child (plane) process
-        Plane plane = {.pid = getpid(), .fuel = 100, .last_update_time = time(NULL)}; // Initialize last_update_time
-
-        // Close the write end of the pipe in the child
-        close(plane.pipe_fd[1]);
-
+        Plane plane = {.pid = getpid(), .fuel = 100, .last_update_time = time(NULL)};
         while (1)
         {
             sleep(1); // Fuel decreases every second
@@ -151,41 +109,12 @@ void launch_plane()
                 // Update the last update time
                 plane.last_update_time = time(NULL);
             }
-
-            // Check if the child process received a refuel command
-            char buffer[64];
-            for(int i = 0; i < num_planes; i++){
-                if (plane_id == planes[i].pid){
-            
-                    ssize_t bytesRead = read(planes[i].pipe_fd[1], buffer, sizeof(buffer));
-
-                    if (bytesRead > 0)
-                    {
-                        buffer[bytesRead] = '\0';
-
-                    // Handle the refuel command
-                        if (strcmp(buffer, "refuel") == 0)
-                        {
-                            // Refuel the plane
-                            plane.fuel = 100;
-                            printf("Plane %d has been refueled\n", plane.pid);
-                        }
-                    }
-                }
-            }
         }
     }
     else if (pid > 0)
     {
         // Parent (base) process
-        planes[num_planes++] = (Plane){.pid = pid, .fuel = 100, .last_update_time = time(NULL)}; // Initialize last_update_time
-        // Create a pipe for communication
-        if (pipe(planes[num_planes - 1].pipe_fd) == -1)
-        {
-            perror("Failed to create pipe");
-            exit(EXIT_FAILURE);
-        }
-
+        planes[num_planes++] = (Plane){.pid = pid, .fuel = 100, .last_update_time = time(NULL)};
         printf("Plane %d launched!\n", pid);
     }
     else
@@ -194,6 +123,7 @@ void launch_plane()
     }
 }
 
+// Function to send a bomb signal to a plane
 void bomb_plane()
 {
     if (num_planes > 0)
@@ -201,6 +131,7 @@ void bomb_plane()
         printf("Enter plane ID to bomb: ");
         scanf("%d", &plane_id);
 
+        // Search for the specified plane ID and send a bomb signal
         for (int i = 0; i < num_planes; i++)
         {
             if (planes[i].pid == plane_id)
@@ -224,21 +155,19 @@ void bomb_plane()
     }
 }
 
+// Function to send a refuel signal to a plane
 void refuel_plane()
 {
-
     if (num_planes > 0)
     {
-        
         printf("Enter plane ID to refuel: ");
         scanf("%d", &plane_id);
 
+        // Search for the specified plane ID and send a refuel signal
         for (int i = 0; i < num_planes; i++)
         {
             if (planes[i].pid == plane_id)
             {
-                // Send refuel command to the specific child process using a pipe
-                write(planes[i].pipe_fd[1], "refuel", strlen("refuel"));
                 kill(planes[i].pid, SIGUSR2);
                 return;
             }
@@ -251,14 +180,25 @@ void refuel_plane()
     }
 }
 
+// Signal handler function
 void sig_handler(int signum)
 {
+    // Handle SIGUSR1 signal (bomb signal)
     if (signum == SIGUSR1)
     {
         printf("Bomber %d to base, bombs away!\n", getpid());
     }
+    // Handle SIGUSR2 signal (refuel signal)
     else if (signum == SIGUSR2)
     {
-        //
+        // Refuel the plane with the matching process ID
+        for (int i = 0; i < num_planes; i++)
+        {
+            if (plane_id == planes[i].pid)
+            {
+                planes[i].fuel = 100;
+                printf("Plane %d has been refueled.\n", getpid());
+            }
+        }
     }
 }
